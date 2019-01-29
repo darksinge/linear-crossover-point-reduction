@@ -60,7 +60,9 @@ class LinearCrossoverPointReduction(object):
 
     def cross_reduce(self, v: np.ndarray, iterations=None):
         """
-        "Smooths" the line out
+        "Smooths" the line out. The "reduction" in this step has to do with
+        reducing the local maximum and local minimum data points.
+
         @param v: the vector that is being reduced
         @param iterations: the number of iterations to process `v`. The more iterations, the
                      more the original line will conform to it's "underlying" shape.
@@ -122,14 +124,20 @@ class LinearCrossoverPointReduction(object):
 
 
 if __name__ == "__main__":
-    y_vals = [0, 9, 6, 6, 5, 6, 6, 6, 7, 6, 6, 5, 0]
-    v = np.array([p for p in zip(range(len(y_vals)), y_vals)], dtype=(float, 2))
+    # x = np.linspace(-np.pi, np.pi, 10)
+    y = [0, 9, 6, 6, 5, 6, 6, 6, 7, 6, 6, 5, 0]
+    # y = np.sin(x)
+
+    x = [i for i in range(len(y))]
+
+    # v = np.array([p for p in zip(range(len(y_vals)), y_vals)], dtype=(float, 2))
+    v = np.array([p for p in zip(x, y)], dtype=(float, 2))
 
     lcpr = LinearCrossoverPointReduction()
 
-    u = lcpr.cross_reduce(v, iterations=100)
+    u = lcpr.cross_reduce(v, iterations=2)
 
-    plt.plot([x[0] for x in v], [x[1] for x in v], 'b')
-    plt.plot([x[0] for x in u], [x[1] for x in u], 'r')
+    plt.plot([x[0] for x in v], [x[1] for x in v], linewidth=3)
+    plt.plot([x[0] for x in u], [x[1] for x in u], 'o--', linewidth=2)
     plt.show()
 
