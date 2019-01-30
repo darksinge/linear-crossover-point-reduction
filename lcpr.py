@@ -14,6 +14,11 @@ class LinearCrossoverPointReduction(object):
     def __init__(self):
         pass
 
+    def lcpr(self, v: np.ndarray, iterations=None):
+        v = self.cross_reduce(v, iterations=iterations)
+        v = self.point_reduce(v)
+        return v
+
     def _slope(self, p1, p2):
         x1, y1 = p1
         x2, y2 = p2
@@ -119,13 +124,37 @@ class LinearCrossoverPointReduction(object):
 
         return ou, uo
 
-    def point_reduce(self, v: np.ndarray):
-        pass
+    def point_reduce(self, u: np.ndarray, v: np.ndarray):
+        """
+        Reduces the amount of points in `u'.
+
+        :param u: the altered set of `v' points
+        :param v: the original set of points
+        :return: the reduced set of points
+        """
+        # first, eliminate any points that are in `u' but not `v'
+        q = []
+        for p1, p2 in zip(u, v):
+            if p1[0] == p2[0] and p1[1] == p2[1]:
+                q.append((p1[0], p1[1]))
+
+        
+
+        # alpha = 0.5
+        # avg_slope = 0
+        # for i in range(0, len(v)):
+        #     for j in range(1, len(v)):
+        #         prev = v[i]
+        #         curr = v[j]
+        #         slope = self._slope(prev, curr)
+        #         if abs(avg_slope - slope) > alpha:
+        #             pass
+        return q
 
 
 if __name__ == "__main__":
     # x = np.linspace(-np.pi, np.pi, 10)
-    y = [0, 9, 6, 6, 5, 6, 6, 6, 7, 6, 6, 5, 0]
+    y = [0, 8, 8, 6, 6, 5, 6, 6, 6, 7, 6, 6, 5, 0]
     # y = np.sin(x)
 
     x = [i for i in range(len(y))]
@@ -135,7 +164,8 @@ if __name__ == "__main__":
 
     lcpr = LinearCrossoverPointReduction()
 
-    u = lcpr.cross_reduce(v, iterations=2)
+    u = lcpr.cross_reduce(v, iterations=1)
+    u = lcpr.point_reduce(u, v)
 
     plt.plot([x[0] for x in v], [x[1] for x in v], linewidth=3)
     plt.plot([x[0] for x in u], [x[1] for x in u], 'o--', linewidth=2)
