@@ -79,12 +79,17 @@ class LinearCrossoverPointReduction(object):
         ou, uo = self.get_crossover_points(v)
 
         u = v.copy()
+        # take the first point of `u' to be the average of `uo[0]' and `ou[0]'
+        u[0] = ((ou[0][0] + uo[0][0]) / 2.0, (ou[0][1] + uo[0][1]) / 2.0)
 
         for i in range(1, len(v)):
 
+            # get the points of intersection for `ou->v' and `uo->v'
             ou_ipoint = self._point_of_intersection(ou[i-1], ou[i], v[i-1], v[i])
             uo_ipoint = self._point_of_intersection(uo[i-1], uo[i], v[i-1], v[i])
 
+            # check if `ou_point' and `v[i]' intersect between the x-value of
+            # the previous point and the x-value of the current point.
             ou_intersects = self._target_in_bounds(ou_ipoint[0], ou[i-1][0], ou[i][0], v[i-1][0], v[i][0])
             uo_intersects = self._target_in_bounds(uo_ipoint[0], uo[i-1][0], uo[i][0], v[i-1][0], v[i][0])
 
@@ -169,4 +174,5 @@ def main():
     plt.savefig("./data/images/plots/~.png", dpi=1000)
 
 
-main()
+if __name__ == '__main__':
+    main()
