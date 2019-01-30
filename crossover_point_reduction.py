@@ -6,6 +6,8 @@ the original vector in as few data points as possible.
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import stats
+import math
 
 
 class LinearCrossoverPointReduction(object):
@@ -13,7 +15,7 @@ class LinearCrossoverPointReduction(object):
     def __init__(self):
         pass
 
-    def _slope(self, p1, p2):
+    def slope(self, p1, p2):
         x1, y1 = p1
         x2, y2 = p2
 
@@ -24,14 +26,14 @@ class LinearCrossoverPointReduction(object):
         a = y2 - y1
         return a / b
 
-    def _y_intercept(self, p1, p2):
+    def y_intercept(self, p1, p2):
         """
         Find the y-intercept formed by points p1 and p2
         :param p1: first x,y-coordinate
         :param p2: second x,y-coordinate
         :return:
         """
-        slope = self._slope(p1, p2)
+        slope = self.slope(p1, p2)
         x1, y1 = p1
         y_int = y1 - slope * x1
         return 0.0, y_int
@@ -71,8 +73,9 @@ class LinearCrossoverPointReduction(object):
         # uo = vector of under-over points
         ou, uo = self.get_crossover_points(v)
 
-        u = np.empty(v.shape, dtype=float)
-        u[0] = v[0]
+        # u = np.empty(v.shape, dtype=float)
+        u = v.copy()
+        u[0] = ((ou[0][0] + uo[0][0]) / 2.0, (ou[0][1] + uo[0][1]) / 2.0)
 
         for i in range(1, len(v)):
             ou1 = ou[i-1]
@@ -103,6 +106,7 @@ class LinearCrossoverPointReduction(object):
                 x = (ou[i][0] + uo[i][0]) / 2.0
                 y = (ou[i][1] + uo[i][1]) / 2.0
                 u[i+1] = (x, y)
+                # u[i+1] = None
 
         assert len(u) == len(v)
 
@@ -116,7 +120,7 @@ class LinearCrossoverPointReduction(object):
 
         uo = np.empty(v.shape, dtype=float)
         for i in range(1, lenv):
-            if self._slope(v[i], v[i - 1]) != 0:
+            if self.slope(v[i], v[i - 1]) != 0:
                 x = v[i][0]
                 y = v[i-1][1]
                 uo[i-1] = (x, y)
@@ -126,7 +130,7 @@ class LinearCrossoverPointReduction(object):
 
         ou = np.empty(v.shape, dtype=float)
         for i in range(0, lenv-1):
-            if self._slope(v[i], v[i+1]) != 0:
+            if self.slope(v[i], v[i + 1]) != 0:
                 x = v[i][0]
                 y = v[i+1][1]
                 ou[i] = (x, y)
@@ -140,16 +144,70 @@ class LinearCrossoverPointReduction(object):
         pass
 
 
+def get_points(slope, intercept, start, end):
+    x = []
+    y = []
+
+    start = int(start)
+    end = int(end)
+
+    for i in range(start, end):
+        x.append(i)
+        y.append(slope * i + intercept)
+
+    return x, y
+
+
 if __name__ == "__main__":
-    v = [0, 9, 6, 6, 5, 6, 6, 6, 7, 6, 6, 5, 0]
+    # v = [0, 9, 6, 6, 5, 6, 6, 6, 7, 6, 6, 5]
+    v = np.random.randint(0, 20, size=10)
+    # v = [0] + v
     v = [p for p in zip(range(len(v)), v)]
     v = np.array(v, dtype=(float, 2))
 
     lcpr = LinearCrossoverPointReduction()
 
-    u = lcpr.cross_reduce(v, iterations=10)
+    vx = [x[0] for x in v]
+    vy = [y[1] for y in v]
+    slope, intercept, _, _, _ = stats.linregress(vx, vy)
+    lx, ly = get_points(slope, intercept, vx[0], vx[-1])
 
-    plt.plot([x[0] for x in v], [x[1] for x in v], 'b')
-    plt.plot([x[0] for x in u], [x[1] for x in u], 'r')
-    plt.show()
+    u = v.copy()
+    i = 0
+    done = False
+    while not done:
+
+        u = lcpr.cross_reduce(u, iterations=None)
+
+        plt.plot(vx, vy, 'k.')
+
+        ux = []
+        uy = []
+
+        for x, y in u:
+            if math.isnan(x) or math.isnan(y):
+                continue
+
+            if x == 0 and y == 0:
+                continue
+
+            ux.append(x)
+            uy.append(y)
+
+        if len(ux) == 2:
+
+            slope, intercept, _, _, _ = stats.linregress(ux, uy)
+            lux, luy = get_points(slope, intercept, vx[0], vx[-1])
+            # plt.plot(ux, uy, '')
+
+            plt.plot(lx, ly, '-')  # line of best fit
+            plt.plot(lux, luy, '--')  # something... else...
+
+            plt.show()
+            plt.clf()
+
+        elif len(ux) < 2:
+            break
+
+        i += 1
 
