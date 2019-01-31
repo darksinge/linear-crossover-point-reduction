@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 # from operator import xor
 import pandas as pd
 from functools import reduce
+from scipy.spatial.distance import cosine
 
 from dataloader import group_events, save_plot
 
@@ -29,6 +30,9 @@ class LinearCrossoverPointReduction(object):
         a = y2 - y1
         return a / b
 
+    def point_average(self, x1, y1, x2, y2):
+        return (x1 + x2) / 2.0, (y1 + y2) / 2.0
+
     def _y_intercept(self, p1, p2):
         """
         Find the y-intercept formed by points p1 and p2
@@ -40,6 +44,16 @@ class LinearCrossoverPointReduction(object):
         x1, y1 = p1
         y_int = y1 - slope * x1
         return 0.0, y_int
+
+    def std_dev(self, v: np.ndarray):
+        """
+        Returns the standard deviation of an array
+        """
+        if not isinstance(v, np.ndarray):
+            v = np.array(v, dtype=(float, 2))
+
+        u = np.array([x[1] for x in v])
+        return u.std()
 
     def _point_of_intersection(self, a1, a2, b1, b2):
         """
@@ -67,9 +81,10 @@ class LinearCrossoverPointReduction(object):
         "Smooths" the line out. The "reduction" in this step has to do with
         reducing the local maximum and local minimum data points.
 
-        @param v: the vector that is being reduced
-        @param iterations: the number of iterations to process `v`. The more iterations, the
+        :param v: the vector that is being reduced
+        :param iterations: the number of iterations to process `v`. The more iterations, the
                      more the original line will conform to it's "underlying" shape.
+        :return the cross-reduced numpy array and the difference of `v's and `u's standard deviations
         """
         if not isinstance(v, np.ndarray):
             v = np.array(v)
@@ -79,27 +94,30 @@ class LinearCrossoverPointReduction(object):
         ou, uo = self.get_crossover_points(v)
 
         u = v.copy()
-        # take the first point of `u' to be the average of `uo[0]' and `ou[0]'
-        u[0] = ((ou[0][0] + uo[0][0]) / 2.0, (ou[0][1] + uo[0][1]) / 2.0)
 
-        for i in range(1, len(v)):
+        for i in range(1, len(v)-1):
 
             # get the points of intersection for `ou->v' and `uo->v'
             ou_ipoint = self._point_of_intersection(ou[i-1], ou[i], v[i-1], v[i])
-            uo_ipoint = self._point_of_intersection(uo[i-1], uo[i], v[i-1], v[i])
+            uo_ipoint = self._point_of_intersection(uo[i-1], uo[i], v[i], v[i+1])
 
             # check if `ou_point' and `v[i]' intersect between the x-value of
             # the previous point and the x-value of the current point.
             ou_intersects = self._target_in_bounds(ou_ipoint[0], ou[i-1][0], ou[i][0], v[i-1][0], v[i][0])
-            uo_intersects = self._target_in_bounds(uo_ipoint[0], uo[i-1][0], uo[i][0], v[i-1][0], v[i][0])
+            uo_intersects = self._target_in_bounds(uo_ipoint[0], uo[i-1][0], uo[i][0], v[i][0], v[i+1][0])
 
-            assert not(ou_intersects and uo_intersects)
+            # assert not(ou_intersects and uo_intersects)
 
-            if ou_intersects:
+            if ou_intersects and uo_intersects:
+                u[i] = self.point_average(v[i][0], uo[i][1], v[i][0], ou[i][1])
+            elif ou_intersects:
                 u[i] = ou_ipoint
+
             elif uo_intersects:
                 u[i] = uo_ipoint
+
             else:
+                # u[i] = self.point_average(uo[i][0], uo[i][1], ou[i][0], ou[i][1])
                 u[i] = v[i]
 
         u = self.point_reduce(u, v)
@@ -107,7 +125,8 @@ class LinearCrossoverPointReduction(object):
         if iterations:
             return self.cross_reduce(u, iterations - 1)
         else:
-            return u
+            deviation = abs(self.std_dev(v) - self.std_dev(u))
+            return u, deviation
 
     def get_crossover_points(self, v: np.ndarray):
         lenv = len(v)
@@ -131,11 +150,31 @@ class LinearCrossoverPointReduction(object):
         return ou, uo
 
     def point_reduce(self, u: np.ndarray, v: np.ndarray):
-        q = []
+        if u.shape != v.shape:
+            raise ValueError("mismatched dimensions")
 
+        q = []
+        # find the union of `u' and `v', store in `q`
         for p1, p2 in zip(u, v):
             if p1[0] == p2[0] and p1[1] == p2[1]:
-                q.append((p1[0], p1[1]))
+                q.append(tuple(p1))
+
+        # remove consecutive points in 'q'
+        tolerance = 0.001
+        n = len(q) - 1
+        i = 1
+        while i < n:
+
+            a: int = q[i-1][1]
+            b: int = q[i][1]
+            c: int = q[i+1][1]
+
+            # if abs(b - a) < tolerance:
+            if abs(b - a + c - b) < 2*tolerance:
+                q.pop(i)
+                n -= 1
+            else:
+                i += 1
 
         return np.array(q, dtype=(float, 2))
 
@@ -144,6 +183,7 @@ def main():
 
     # x = np.linspace(-np.pi, np.pi, 10)
     # y = [0, 9, 6, 6, 5, 6, 6, 6, 7, 6, 6, 5, 0]
+    # y = [0, 4, 2, 2, 0]
     # y = np.sin(x)
 
     # groups = group_events()
@@ -155,8 +195,7 @@ def main():
     df = pd.read_csv("./data/output/csv/79.csv")
     # df = groups[18]
 
-    y = [x for x in df['pulse']][900:1300]
-
+    y = [x for x in df['pulse']][:3]
     x = [i for i in range(len(y))]
 
     # v = np.array([p for p in zip(range(len(y_vals)), y_vals)], dtype=(float, 2))
@@ -164,14 +203,36 @@ def main():
 
     lcpr = LinearCrossoverPointReduction()
 
-    u = lcpr.cross_reduce(v, iterations=10)
-    # u = lcpr.point_reduce(u, v)
+    u = v.copy()
+    done = False
+    n = 0
+    while not done:
+        u, std_err = lcpr.cross_reduce(u, iterations=None)
 
-    plt.plot([x[0] for x in v], [x[1] for x in v], '-', linewidth=0.5)
-    plt.plot([x[0] for x in u], [x[1] for x in u], '--', linewidth=0.5)
-    # plt.show()
+        plt.plot([x[0] for x in v], [x[1] for x in v], '-', linewidth=2)
+        plt.plot([x[0] for x in u], [x[1] for x in u], 'o--', linewidth=2)
+        plt.show()
+        plt.clf()
 
-    plt.savefig("./data/images/plots/~.png", dpi=1000)
+        for j in range(2, len(u)):
+            xdiff, ydiff = u[j-2]
+            U = (u[j][0] - xdiff, u[j][1] - ydiff)
+            V = (u[j-1][0] - xdiff, u[j-1][1] - ydiff)
+            c = cosine(U, V)
+            if c > 10.0:
+                U = (U[0] + xdiff, U[1] + ydiff)
+                V = (V[0] + xdiff, V[1] + ydiff)
+                print(U, V)
+            print(c)
+
+        n += 1
+        if len(u) < 2 or n > 20:
+            done = True
+
+        if std_err < 0.01:
+            print('converged in %d cycle%s' % (n, "s" if n > 1 else ""))
+            done = True
+    # plt.savefig("./data/images/plots/~.png", dpi=1000)
 
 
 if __name__ == '__main__':
