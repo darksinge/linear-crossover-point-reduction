@@ -151,8 +151,8 @@ def save_plot(df, path, fname=None, dpi=300, ftype="png"):
     y = df.pulse
 
     plt.plot(x, y)
-    plt.ylim(bottom=0)
-    plt.xticks(rotation=90)
+    plt.xlabel('Time (DD HH:MM)')
+    plt.ylabel('Water Meter Pulse (RPM)')
 
     start = df.timestamp.iloc[0]
     end = df.timestamp.iloc[-1]
@@ -164,10 +164,11 @@ def save_plot(df, path, fname=None, dpi=300, ftype="png"):
     seconds = int(tdelta.seconds - (minutes * 60))
 
     title = "{s} - {e}, {m} minutes, {sec} seconds".format(s=start.strftime("%I:%M %p"),
-                                                                        e=end.strftime("%I:%M %p"),
-                                                                        m=minutes, sec=seconds)
+                                                           e=end.strftime("%I:%M %p"),
+                                                           m=minutes, sec=seconds)
 
     plt.title(title)
+    # plt.tight_layout()
 
     if fname is None:
 

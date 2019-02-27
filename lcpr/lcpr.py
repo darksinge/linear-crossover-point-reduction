@@ -6,10 +6,11 @@ the original vector in as few data points as possible.
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 # from operator import xor
 import pandas as pd
 from functools import reduce
-from scipy.spatial.distance import cosine
+# from scipy.spatial.distance import cosine
 
 from dataloader import group_events, save_plot
 
@@ -44,6 +45,22 @@ class LinearCrossoverPointReduction(object):
         x1, y1 = p1
         y_int = y1 - slope * x1
         return 0.0, y_int
+
+    def cosine(self, u: (float, float), v: (float, float)) -> float:
+        """
+        Returns the cosine angle between two 2D vectors in degrees
+        :param u: the first vector
+        :param v: the second vector
+        :return: the angle between `u` and `v` in degrees
+        """
+        x1, y1 = u
+        x2, y2 = v
+        udotv = x1 * x2 + y1 * y2
+        umag = np.sqrt(x1 ** 2 + y1 ** 2)
+        vmag = np.sqrt(x2 ** 2 + y2 ** 2)
+        cos = udotv / (umag * vmag)
+        arccos = np.arccos(cos)
+        return np.rad2deg(arccos)
 
     def std_dev(self, v: np.ndarray):
         """
@@ -120,7 +137,7 @@ class LinearCrossoverPointReduction(object):
                 # u[i] = self.point_average(uo[i][0], uo[i][1], ou[i][0], ou[i][1])
                 u[i] = v[i]
 
-        u = self.point_reduce(u, v)
+        # u = self.point_reduce(u, v)
 
         if iterations:
             return self.cross_reduce(u, iterations - 1)
@@ -156,21 +173,37 @@ class LinearCrossoverPointReduction(object):
         q = []
         # find the union of `u' and `v', store in `q`
         for p1, p2 in zip(u, v):
-            if p1[0] == p2[0] and p1[1] == p2[1]:
+            # if p1[0] == p2[0] and p1[1] == p2[1]:
+            if tuple(p1) == tuple(p2):
                 q.append(tuple(p1))
 
-        # remove consecutive points in 'q'
+        # remove the middle of 3 consecutive points in 'q'
         tolerance = 0.001
         n = len(q) - 1
         i = 1
         while i < n:
 
-            a: int = q[i-1][1]
-            b: int = q[i][1]
-            c: int = q[i+1][1]
+            a: float = q[i-1][1]  # first point's y-value
+            b: float = q[i][1]    # middle point's y-value
+            c: float = q[i+1][1]  # last point's y-value
 
-            # if abs(b - a) < tolerance:
-            if abs(b - a + c - b) < 2*tolerance:
+            # check the distance between the first and middle, and the middle and last
+            if abs((b - a) + (c - b)) < 2*tolerance:
+                q.pop(i)
+                n -= 1
+            else:
+                i += 1
+
+        # take the average of 2 consecutive points
+        n = len(q)
+        i = 1
+        while i < n:
+            x1, y1 = q[i - 1]
+            x2, y2 = q[i]
+
+            if y1 == y2:
+                x, y = (x1+x2) / 2., (y1+y2) / 2.
+                q[i-1] = (x, y)
                 q.pop(i)
                 n -= 1
             else:
@@ -178,12 +211,26 @@ class LinearCrossoverPointReduction(object):
 
         return np.array(q, dtype=(float, 2))
 
+    def point_reduce_vector(self, u, max_y_variation=0.5):
+        pleft = []
+        pright = []
+        for i in range(1, len(u)):
+            variation = abs(u[i-1][1] - u[i][1])
+            if variation > max_y_variation:
+                pleft.append(u[i-1])
+                pright.append(u[i])
+
+        p = pleft + pright
+        p.sort(key=lambda x: x[0])
+
+        return p
+
 
 def main():
 
     # x = np.linspace(-np.pi, np.pi, 10)
     # y = [0, 9, 6, 6, 5, 6, 6, 6, 7, 6, 6, 5, 0]
-    # y = [0, 4, 2, 2, 0]
+    # y = [0, 20, 20, 1, 2, 0]
     # y = np.sin(x)
 
     # groups = group_events()
@@ -195,7 +242,7 @@ def main():
     df = pd.read_csv("./data/output/csv/79.csv")
     # df = groups[18]
 
-    y = [x for x in df['pulse']][:3]
+    y = [x for x in df['pulse']][:100]
     x = [i for i in range(len(y))]
 
     # v = np.array([p for p in zip(range(len(y_vals)), y_vals)], dtype=(float, 2))
@@ -206,32 +253,41 @@ def main():
     u = v.copy()
     done = False
     n = 0
+    figure: Figure = plt.figure()
+    figure.dpi = 300
     while not done:
         u, std_err = lcpr.cross_reduce(u, iterations=None)
 
-        plt.plot([x[0] for x in v], [x[1] for x in v], '-', linewidth=2)
-        plt.plot([x[0] for x in u], [x[1] for x in u], 'o--', linewidth=2)
-        plt.show()
-        plt.clf()
+        # plt.plot([x[0] for x in v], [x[1] for x in v], '-', linewidth=2)
+        # plt.plot([x[0] for x in u], [x[1] for x in u], 'o--', linewidth=2)
+        # plt.show()
+        # plt.clf()
 
-        for j in range(2, len(u)):
-            xdiff, ydiff = u[j-2]
-            U = (u[j][0] - xdiff, u[j][1] - ydiff)
-            V = (u[j-1][0] - xdiff, u[j-1][1] - ydiff)
-            c = cosine(U, V)
-            if c > 10.0:
-                U = (U[0] + xdiff, U[1] + ydiff)
-                V = (V[0] + xdiff, V[1] + ydiff)
-                print(U, V)
-            print(c)
+        # for j in range(2, len(u)):
+        #     xdiff, ydiff = u[j-2]
+        #     U = (u[j][0] - xdiff, u[j][1] - ydiff)
+        #     V = (u[j-1][0] - xdiff, u[j-1][1] - ydiff)
+        #     angle = lcpr.cosine(U, V)
+        #     if angle > 10.0:
+        #         U = (U[0] + xdiff, U[1] + ydiff)
+        #         V = (V[0] + xdiff, V[1] + ydiff)
+        #         print(U, V)
+        #     print(angle)
 
         n += 1
-        if len(u) < 2 or n > 20:
+        if len(u) <= 4:
             done = True
 
         if std_err < 0.01:
             print('converged in %d cycle%s' % (n, "s" if n > 1 else ""))
             done = True
+
+    u = lcpr.point_reduce_vector(u, 0.5)
+    plt.plot([x[0] for x in v], [x[1] for x in v], '-', linewidth=2)
+    plt.plot([x[0] for x in u], [x[1] for x in u], 'o--', linewidth=2)
+    plt.show()
+    plt.clf()
+
     # plt.savefig("./data/images/plots/~.png", dpi=1000)
 
 
