@@ -13,6 +13,7 @@ from functools import reduce
 # from scipy.spatial.distance import cosine
 
 from dataloader import group_events, save_plot
+from curve_of_water_accumulation import plot_cwa
 
 
 class LinearCrossoverPointReduction(object):
@@ -226,8 +227,7 @@ class LinearCrossoverPointReduction(object):
         return p
 
 
-def main():
-
+def calc_lcpr():
     # x = np.linspace(-np.pi, np.pi, 10)
     # y = [0, 9, 6, 6, 5, 6, 6, 6, 7, 6, 6, 5, 0]
     # y = [0, 20, 20, 1, 2, 0]
@@ -242,7 +242,7 @@ def main():
     df = pd.read_csv("./data/output/csv/79.csv")
     # df = groups[18]
 
-    y = [x for x in df['pulse']][:100]
+    y = [x for x in df['pulse']][:25]
     x = [i for i in range(len(y))]
 
     # v = np.array([p for p in zip(range(len(y_vals)), y_vals)], dtype=(float, 2))
@@ -258,10 +258,7 @@ def main():
     while not done:
         u, std_err = lcpr.cross_reduce(u, iterations=None)
 
-        # plt.plot([x[0] for x in v], [x[1] for x in v], '-', linewidth=2)
-        # plt.plot([x[0] for x in u], [x[1] for x in u], 'o--', linewidth=2)
-        # plt.show()
-        # plt.clf()
+        # plot_lcpr(u, v)
 
         # for j in range(2, len(u)):
         #     xdiff, ydiff = u[j-2]
@@ -282,13 +279,29 @@ def main():
             print('converged in %d cycle%s' % (n, "s" if n > 1 else ""))
             done = True
 
-    u = lcpr.point_reduce_vector(u, 0.5)
+    # u = lcpr.point_reduce_vector(u, 0.5)
+    # plt.plot([x[0] for x in v], [x[1] for x in v], '-', linewidth=2)
+    # plt.plot([x[0] for x in u], [x[1] for x in u], 'o--', linewidth=2)
+    # plt.show()
+    # plt.clf()
+
+    # plt.savefig("./data/images/plots/~.png", dpi=1000)
+    return u, v
+
+
+def plot_lcpr(u, v):
     plt.plot([x[0] for x in v], [x[1] for x in v], '-', linewidth=2)
     plt.plot([x[0] for x in u], [x[1] for x in u], 'o--', linewidth=2)
     plt.show()
     plt.clf()
 
-    # plt.savefig("./data/images/plots/~.png", dpi=1000)
+
+def main():
+    lcpr = LinearCrossoverPointReduction()
+    u, v = calc_lcpr()
+    u = lcpr.point_reduce_vector(u)
+    plot_lcpr(u, v)
+    plot_cwa(u, v)
 
 
 if __name__ == '__main__':
